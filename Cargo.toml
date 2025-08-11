@@ -1,0 +1,93 @@
+[package]
+name = "api-framework"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+env = []
+transactions = [
+    "workflow",
+    "dep:sha2",
+    "dep:zip",
+    "dep:async_zip",
+    "dep:sanitize-filename",
+]
+shutdown = ["dep:self-replace"]
+workflow = ["env", "framework"]
+middleware = []
+framework = ["env"]
+
+full = [
+    "env",
+    "transactions",
+    "shutdown",
+    "workflow",
+    "middleware",
+    "framework",
+]
+default = ["full"]
+
+[dependencies]
+anyhow = "1.0.98"
+tracing = "0.1.41"
+reqwest = { version = "0.12.22", features = ["json", "blocking", "stream"] }
+serde = { version = "1.0.219", features = ["derive"] }
+sha2 = { version = "0.10.9", optional = true }
+zip = { version = "4.3.0", default-features = false, features = [
+    "deflate",
+], optional = true }
+parking_lot = "0.12"
+futures = "0.3"
+async_zip = { version = "=0.0.17", features = [
+    "async-compression",
+    "deflate",
+    "bzip2",
+    "lzma",
+    "xz",
+    "zstd",
+    "deflate64",
+], optional = true }
+tokio = { version = "1.47", features = [
+    "macros",
+    "fs",
+    "rt-multi-thread",
+    "sync",
+    "signal",
+] }
+tokio-util = { version = "0.7", features = ["io", "compat"] }
+sanitize-filename = { version = "0.6.0", optional = true }
+self-replace = { version = "1.5.0", optional = true }
+hex = "0.4.3"
+
+[workspace.lints.rust]
+missing-docs = "warn"
+missing-debug-implementations = "warn"
+let-underscore-drop = "warn"
+single-use-lifetimes = "warn"
+trivial-numeric-casts = "warn"
+elided-lifetimes-in-paths = "deny"
+unused-lifetimes = "forbid"
+unused-macro-rules = "warn"
+unused-qualifications = "warn"
+variant-size-differences = "warn"
+dyn-drop = "forbid"
+ellipsis-inclusive-range-patterns = "forbid"
+exported-private-dependencies = "forbid"
+uncommon-codepoints = "deny"
+
+[workspace.lints.clippy]
+missing-panics-doc = "warn"
+missing-errors-doc = "warn"
+cloned-instead-of-copied = "warn"
+future-not-send = "warn"
+if-not-else = "warn"
+if-then-some-else-none = "warn"
+impl-trait-in-params = "warn"
+macro-use-imports = "forbid"
+exhaustive-enums = "warn"
+str-to-string = "warn"
+iter-without-into-iter = "warn"
+decimal-literal-representation = "warn"
+
+[lints]
+workspace = true

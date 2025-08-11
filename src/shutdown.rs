@@ -1,0 +1,84 @@
+//! Provides a shutdown signal to gracefully shut down the process with configurable actions.
+//!
+//! See: [`signal`], [`ShutdownAction`]
+
+#![cfg(feature = "shutdown")]
+
+use crate::static_lazy_lock;
+
+use std::{fs, os::unix::process::CommandExt, process};
+use tokio::{signal, sync::broadcast};
+use tracing::{debug, error, info};
+
+static_lazy_lock! {
+    pub SHUTDOWN: broadcast::Sender<ShutdownAction> = {
+        let (tx, _) = broadcast::channel::<ShutdownAction>(1);
+        return tx
+    };
+    "The broadcast sender to shut down the process."
+}
+
+/// Signals the prcess to shut down.
+///
+/// # Panics
+///
+/// Panics when failed to install the Ctrl + C signal handler.
+pub async fn signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install the Ctrl + C signal handler")
+    };
+
+    let mut shutdown = SHUTDOWN.subscribe();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        result = shutdown.recv() => if let Ok(action) = result { match action {
+        ShutdownAction::Stop => {}
+        ShutdownAction::Restart => restart().await,
+        ShutdownAction::Update { executable_path } => update(&executable_path).await
+        } }
+    }
+}
+
+/// The action to perform when shutting down a process.
+#[non_exhaustive]
+#[derive(Debug, Clone)]
+pub enum ShutdownAction {
+    /// Gracefully stops the process.
+    Stop,
+    /// Restarts the process in-place.
+    Restart,
+    /// Updates the process from a new executable file.
+    Update {
+        /// The path to the new executable file.
+        executable_path: String,
+    },
+}
+
+async fn restart() {
+    info!("restarting…");
+    match std::env::current_exe() {
+        Ok(executable_path) => {
+            let err = process::Command::new(executable_path).exec();
+            panic!("unable to restart the process: {err}!");
+        }
+        Err(err) => panic!("cannot get current executable path: {err}!"),
+    }
+}
+
+async fn update(executable_path: &str) {
+    info!("updating from {}…", executable_path);
+    match self_replace::self_replace(executable_path) {
+        Ok(_) => {
+            debug!(
+                "successfully replaced executable file from {executable_path}, removing abundant files…"
+            );
+            drop(fs::remove_file(executable_path));
+        }
+        Err(err) => error!("failed replacing executable file from {executable_path}: {err}"),
+    }
+
+    restart().await
+}
