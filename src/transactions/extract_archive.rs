@@ -23,7 +23,7 @@ pub async fn extract_archive<R, P>(
 ) -> Result<(), ZipError>
 where
     R: AsyncBufRead + Unpin,
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + Sync,
 {
     drop(tokio::fs::remove_dir_all(&path).await);
     tokio::fs::create_dir(&path).await?;

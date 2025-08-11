@@ -11,10 +11,10 @@ use futures::{AsyncReadExt as _, Stream, TryStreamExt as _};
 use sha2::Digest;
 use tokio::fs::remove_dir_all;
 use tokio_util::bytes::Bytes;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 enum Case {
-    Deployed,
+    Extracted,
     Failed(Error),
     HashUnmatch,
 }
@@ -59,10 +59,15 @@ where
             // Reads to end for consuming whole buf to hasher, neglecting the error
             drop(read.read_to_end(&mut Vec::new()).await);
 
-            if hex::encode(sha_hasher.finalize()) == digest.unwrap()[7..] {
-                Case::Deployed
+            if let Some(digest) = digest {
+                if hex::encode(sha_hasher.finalize()) == digest[7..] {
+                    Case::Extracted
+                } else {
+                    Case::HashUnmatch
+                }
             } else {
-                Case::HashUnmatch
+                warn!("digest not provided for {path}");
+                Case::Extracted
             }
         }
         Err(err) => Case::Failed(anyhow!(err)),
@@ -71,7 +76,7 @@ where
 
 async fn cleanup(artifact: Artifact, case: Case, path: &str) {
     match case {
-        Case::Deployed => info!("successfully extracted {artifact} to {path}"),
+        Case::Extracted => info!("successfully extracted {artifact} to {path}"),
         Case::HashUnmatch => {
             error!("failed to extract {artifact} to {path}: broken artifact",);
             drop(remove_dir_all(path).await);
