@@ -14,17 +14,9 @@ transactions = [
 ]
 shutdown = ["dep:self-replace"]
 workflow = ["env", "framework"]
-middleware = []
 framework = ["env"]
 
-full = [
-    "env",
-    "transactions",
-    "shutdown",
-    "workflow",
-    "middleware",
-    "framework",
-]
+full = ["env", "transactions", "shutdown", "workflow", "framework"]
 default = ["full"]
 
 [dependencies]
