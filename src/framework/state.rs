@@ -9,7 +9,7 @@ use tracing::{error, warn};
 /// assert!(value == 42);
 ///
 /// fn scope() -> State<()> {
-///     // This line returns the function with a `State::<()>::Stop` immediately
+///     // This line returns the function with a `State::Stop` immediately
 ///     let value: i32 = unwrap!(State::Stop);
 ///
 ///     // This line will never be executed
@@ -23,8 +23,8 @@ macro_rules! unwrap {
     ($expr:expr) => {
         match $expr {
             $crate::framework::State::Success(v) => v,
-            $crate::framework::State::Retry => return $crate::framework::State::<()>::Retry,
-            $crate::framework::State::Stop => return $crate::framework::State::<()>::Stop,
+            $crate::framework::State::Retry => return $crate::framework::State::Retry,
+            $crate::framework::State::Stop => return $crate::framework::State::Stop,
         }
     };
 }
