@@ -3,7 +3,6 @@ use tracing::{error, warn};
 use crate::env::MAX_RETRY;
 
 /// A state that controls the flow of data.
-#[non_exhaustive]
 #[derive(Debug, PartialEq, Eq)]
 pub enum State<T> {
     /// The control flow should exit with a value.
