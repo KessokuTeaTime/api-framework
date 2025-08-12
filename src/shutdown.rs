@@ -28,12 +28,12 @@ static_lazy_lock! {
 ///
 /// # Panics
 ///
-/// Panics when failed to install the Ctrl + C signal handler.
+/// Panics when failed to install Ctrl + C signal handler.
 pub async fn signal() {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
-            .expect("failed to install the Ctrl + C signal handler")
+            .expect("failed to install Ctrl + C signal handler")
     };
 
     let mut shutdown = SHUTDOWN.subscribe();
@@ -66,7 +66,7 @@ pub enum ShutdownAction {
 async fn restart() {
     info!("restarting…");
     let executable_path = std::env::current_exe()
-        .unwrap_or_else(|e| panic!("failed getting current executable path: {e}!"));
+        .unwrap_or_else(|e| panic!("failed to get current executable path: {e}!"));
     restart_from(executable_path).await
 }
 
@@ -85,7 +85,7 @@ where
     info!("updating from {executable_path:?}…");
 
     let current_executable_path = std::env::current_exe()
-        .unwrap_or_else(|e| panic!("failed getting current executable path: {e}!"));
+        .unwrap_or_else(|e| panic!("failed to get current executable path: {e}!"));
 
     match self_replace::self_replace(&executable_path) {
         Ok(_) => {
@@ -95,7 +95,7 @@ where
             drop(fs::remove_file(executable_path));
         }
         Err(err) => {
-            error!("failed replacing executable file from {executable_path:?}: {err}")
+            error!("failed to replace executable file from {executable_path:?}: {err}")
         }
     }
 
