@@ -13,38 +13,8 @@ use std::{
     },
 };
 
+use parking_lot::Mutex;
 use tracing::{error, info, warn};
-
-/// Unwraps a [`State`] to control the loop of a [`QueuedAsyncFramework`]. This macro accepts a [`State`] value, returns the current scope if the value is either [`State::Retry`] or [`State::Stop`], and exposes the data if the value is [`State::Success`].
-///
-/// # Examples
-///
-/// ```rust
-/// let value = unwrap!(State::Success(42));
-/// assert!(value == 42);
-///
-/// fn scope() -> State<()> {
-///     // This line returns the function with a `State::<()>::Stop` immediately
-///     let value: i32 = unwrap!(State::Stop);
-///
-///     // This line will never be executed
-///     State::Success(())
-/// }
-///
-/// assert!(scope() == State::Stop);
-/// ```
-#[macro_export]
-macro_rules! unwrap {
-    ($expr:expr) => {
-        match $expr {
-            $crate::framework::State::Success(v) => v,
-            $crate::framework::State::Retry => return $crate::framework::State::<()>::Retry,
-            $crate::framework::State::Stop => return $crate::framework::State::<()>::Stop,
-        }
-    };
-}
-
-pub use unwrap;
 
 #[derive(Debug, Default)]
 struct BusinessHolder {
@@ -88,7 +58,7 @@ pub struct QueuedAsyncFramework<ID>
 where
     ID: Eq + Hash,
 {
-    businesses: LazyLock<parking_lot::Mutex<HashMap<ID, Arc<BusinessHolder>>>>,
+    businesses: LazyLock<Mutex<HashMap<ID, Arc<BusinessHolder>>>>,
 }
 
 impl<ID> QueuedAsyncFramework<ID>
@@ -98,7 +68,7 @@ where
     /// Creates a [`QueuedAsyncFramework`].
     pub fn new() -> Self {
         Self {
-            businesses: LazyLock::new(|| parking_lot::Mutex::new(HashMap::new())),
+            businesses: LazyLock::new(|| Mutex::new(HashMap::new())),
         }
     }
 }
@@ -165,6 +135,8 @@ where
 #[cfg(test)]
 #[tokio::test]
 async fn example() {
+    use super::unwrap;
+
     // Defines a framework
     // This leverages `LazyLock` to generate a static value
     static FRAMEWORK: LazyLock<QueuedAsyncFramework<i32>> =

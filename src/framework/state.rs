@@ -1,5 +1,36 @@
 use tracing::{error, warn};
 
+/// Unwraps a [`State`], This macro accepts a [`State`] value, returns the current scope if the value is either [`State::Retry`] or [`State::Stop`], and exposes the data if the value is [`State::Success`].
+///
+/// # Examples
+///
+/// ```rust
+/// let value = unwrap!(State::Success(42));
+/// assert!(value == 42);
+///
+/// fn scope() -> State<()> {
+///     // This line returns the function with a `State::<()>::Stop` immediately
+///     let value: i32 = unwrap!(State::Stop);
+///
+///     // This line will never be executed
+///     State::Success(())
+/// }
+///
+/// assert!(scope() == State::Stop);
+/// ```
+#[macro_export]
+macro_rules! unwrap {
+    ($expr:expr) => {
+        match $expr {
+            $crate::framework::State::Success(v) => v,
+            $crate::framework::State::Retry => return $crate::framework::State::<()>::Retry,
+            $crate::framework::State::Stop => return $crate::framework::State::<()>::Stop,
+        }
+    };
+}
+
+pub use unwrap;
+
 use crate::env::MAX_RETRY;
 
 /// A state that controls the flow of data.

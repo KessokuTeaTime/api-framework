@@ -81,7 +81,7 @@ pub async fn fetch_artifacts(
     };
 
     match response.json::<Artifacts>().await {
-        Ok(json) => match json.total_count {
+        Ok(artifacts) => match artifacts.total_count {
             0 => {
                 error!("invalid workflow data: no artifacts at {url}!");
                 State::Stop
@@ -105,10 +105,10 @@ pub async fn fetch_artifacts(
                             1 => info!("fetched 1 artifact from {url}"),
                             count => info!("fetched {count} artifacts from {url}"),
                         }
-                        State::Success(json.artifacts)
+                        State::Success(artifacts.artifacts)
                     }
                 },
-                None => State::Success(json.artifacts),
+                None => State::Success(artifacts.artifacts),
             },
         },
         Err(err) => {
