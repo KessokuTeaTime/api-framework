@@ -30,13 +30,3 @@ static_lazy_lock! {
     pub MAX_RETRY: u8 = parse_env!("MAX_RETRY" => |s| s.parse::<u8>(); anyhow).unwrap_or(5);
     "The maximum retry limit for transactions."
 }
-
-static_lazy_lock! {
-    pub TRACING_MAX_FILES: usize = parse_env!("TRACING_MAX_FILES" => |s| s.parse::<usize>(); anyhow).unwrap_or(5);
-    "The maximum file count to use for tracing."
-}
-
-static_lazy_lock! {
-    pub TRACING_DIR: String = env::var("TRACING_DIR").unwrap_or("/tmp/api/tracing".to_owned());
-    "The directory for tracing files. Defaults to `/tmp/api/tracing` if not specified."
-}
