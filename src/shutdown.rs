@@ -66,12 +66,17 @@ pub enum ShutdownAction {
 async fn restart() {
     info!("restarting…");
     match std::env::current_exe() {
-        Ok(executable_path) => {
-            let err = process::Command::new(executable_path).exec();
-            panic!("unable to restart the process: {err}!");
-        }
+        Ok(executable_path) => restart_from(executable_path).await,
         Err(err) => panic!("cannot get current executable path: {err}!"),
     }
+}
+
+async fn restart_from<P>(executable_path: P)
+where
+    P: AsRef<Path> + Send + Sync + Debug,
+{
+    let err = process::Command::new(executable_path.as_ref()).exec();
+    panic!("unable to restart the process: {err}!");
 }
 
 async fn update<P>(executable_path: P)
@@ -79,15 +84,23 @@ where
     P: AsRef<Path> + Send + Sync + Debug,
 {
     info!("updating from {executable_path:?}…");
-    match self_replace::self_replace(&executable_path) {
-        Ok(_) => {
-            debug!(
-                "successfully replaced executable file from {executable_path:?}, removing abundant files…"
-            );
-            drop(fs::remove_file(executable_path));
-        }
-        Err(err) => error!("failed replacing executable file from {executable_path:?}: {err}"),
-    }
 
-    restart().await
+    match std::env::current_exe() {
+        Ok(current_executable_path) => {
+            match self_replace::self_replace(&executable_path) {
+                Ok(_) => {
+                    debug!(
+                        "successfully replaced executable file from {executable_path:?}, removing abundant files…"
+                    );
+                    drop(fs::remove_file(executable_path));
+                }
+                Err(err) => {
+                    error!("failed replacing executable file from {executable_path:?}: {err}")
+                }
+            }
+
+            restart_from(current_executable_path).await
+        }
+        Err(err) => panic!("cannot get current executable path: {err}!"),
+    }
 }
