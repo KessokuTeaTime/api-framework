@@ -6,7 +6,13 @@
 
 use crate::static_lazy_lock;
 
-use std::{fs, os::unix::process::CommandExt, process};
+use std::{
+    fmt::Debug,
+    fs,
+    os::unix::process::CommandExt,
+    path::{Path, PathBuf},
+    process,
+};
 use tokio::{signal, sync::broadcast};
 use tracing::{debug, error, info};
 
@@ -53,7 +59,7 @@ pub enum ShutdownAction {
     /// Updates the process from a new executable file.
     Update {
         /// The path to the new executable file.
-        executable_path: String,
+        executable_path: PathBuf,
     },
 }
 
@@ -68,16 +74,19 @@ async fn restart() {
     }
 }
 
-async fn update(executable_path: &str) {
-    info!("updating from {}…", executable_path);
-    match self_replace::self_replace(executable_path) {
+async fn update<P>(executable_path: P)
+where
+    P: AsRef<Path> + Send + Sync + Debug,
+{
+    info!("updating from {executable_path:?}…");
+    match self_replace::self_replace(&executable_path) {
         Ok(_) => {
             debug!(
-                "successfully replaced executable file from {executable_path}, removing abundant files…"
+                "successfully replaced executable file from {executable_path:?}, removing abundant files…"
             );
             drop(fs::remove_file(executable_path));
         }
-        Err(err) => error!("failed replacing executable file from {executable_path}: {err}"),
+        Err(err) => error!("failed replacing executable file from {executable_path:?}: {err}"),
     }
 
     restart().await
