@@ -5,6 +5,9 @@ edition = "2024"
 
 [features]
 env = []
+env_github_token = ["env"]
+env_max_retries = ["env"]
+
 transactions = [
     "workflow",
     "dep:sha2",
@@ -13,10 +16,10 @@ transactions = [
     "dep:sanitize-filename",
 ]
 shutdown = ["dep:self-replace"]
-workflow = ["env", "framework"]
-framework = ["env"]
+workflow = ["env_github_token", "framework"]
+framework = ["env_max_retries"]
 
-full = ["env", "transactions", "shutdown", "workflow", "framework"]
+full = ["transactions", "shutdown", "workflow", "framework"]
 default = ["full"]
 
 [dependencies]
@@ -50,6 +53,7 @@ tokio-util = { version = "0.7", features = ["io", "compat"] }
 sanitize-filename = { version = "0.6.0", optional = true }
 self-replace = { version = "1.5.0", optional = true }
 hex = "0.4.3"
+chrono = "0.4.41"
 
 [workspace.lints.rust]
 missing-docs = "warn"

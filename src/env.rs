@@ -21,12 +21,14 @@ macro_rules! parse_env {
 
 pub use parse_env;
 
+#[cfg(feature = "env_github_token")]
 static_lazy_lock! {
     pub GITHUB_TOKEN: String = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN not set in environment");
     "The GitHub token."
 }
 
+#[cfg(feature = "env_max_retries")]
 static_lazy_lock! {
-    pub MAX_RETRY: u8 = parse_env!("MAX_RETRY" => |s| s.parse::<u8>(); anyhow).unwrap_or(5);
+    pub MAX_RETRIES: u8 = parse_env!("MAX_RETRIES" => |s| s.parse::<u8>(); anyhow).unwrap_or(5);
     "The maximum retry limit for transactions."
 }

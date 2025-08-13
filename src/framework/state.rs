@@ -31,7 +31,7 @@ macro_rules! unwrap {
 
 pub use unwrap;
 
-use crate::env::MAX_RETRY;
+use crate::env::MAX_RETRIES;
 
 /// A state that controls the flow of data.
 #[derive(Debug, PartialEq, Eq)]
@@ -76,11 +76,11 @@ impl<T> State<T> {
 /// Returns [`Err<()>`] if retrying is not allowed, otherwise [`Ok<()>`] is returned.
 pub fn retry_if_possible(retry: &mut u8) -> Result<(), ()> {
     *retry += 1;
-    if *retry > *MAX_RETRY {
-        error!("retried for too many times ({}), stopping!", *MAX_RETRY);
+    if *retry > *MAX_RETRIES {
+        error!("retried for too many times ({}), stopping!", *MAX_RETRIES);
         Err(())
     } else {
-        warn!("retrying… ({retry} / {})", *MAX_RETRY);
+        warn!("retrying… ({retry} / {})", *MAX_RETRIES);
         Ok(())
     }
 }
