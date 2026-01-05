@@ -19,8 +19,8 @@ pub mod workflow;
 /// ```
 #[macro_export]
 macro_rules! static_lazy_lock {
-    ($vis:vis $name:ident: $type:ty = $expr:expr; $($doc:expr)?) => {
-        $(#[doc=$doc])?
+    ($(#[$meta:meta])* $vis:vis $name:ident: $type:ty = $expr:expr $(;)?) => {
+        $(#[$meta])*
         $vis static $name: std::sync::LazyLock<$type> =
             std::sync::LazyLock::new(|| $expr);
     };
