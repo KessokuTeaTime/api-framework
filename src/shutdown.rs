@@ -17,11 +17,11 @@ use tokio::{signal, sync::broadcast};
 use tracing::{debug, error, info};
 
 static_lazy_lock! {
+    /// The broadcast sender to shut down the process.
     pub SHUTDOWN: broadcast::Sender<ShutdownAction> = {
         let (tx, _) = broadcast::channel::<ShutdownAction>(1);
         return tx
     };
-    "The broadcast sender to shut down the process."
 }
 
 /// Signals the prcess to shut down.
