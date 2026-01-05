@@ -10,7 +10,7 @@ use anyhow::{Error, anyhow};
 use async_zip::base::read::stream::ZipFileReader;
 use futures::{AsyncReadExt as _, Stream, TryStreamExt as _};
 
-use sha2::Digest;
+use sha2::Digest as _;
 use tokio::fs::remove_dir_all;
 use tokio_util::bytes::Bytes;
 use tracing::{error, info, warn};

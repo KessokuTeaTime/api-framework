@@ -9,7 +9,7 @@ use crate::static_lazy_lock;
 use std::{
     fmt::Debug,
     fs,
-    os::unix::process::CommandExt,
+    os::unix::process::CommandExt as _,
     path::{Path, PathBuf},
     process,
 };

@@ -146,7 +146,7 @@ async fn example() {
     FRAMEWORK
         .run(42, |cx| {
             // Pinboxes the transaction and clone the context
-            Box::pin(transaction(cx.clone()))
+            Box::pin(transaction(cx))
         })
         .await;
 
