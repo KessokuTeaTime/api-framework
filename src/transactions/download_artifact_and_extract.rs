@@ -1,9 +1,9 @@
 use std::{fmt::Debug, path::Path};
 
 use crate::{
-    framework::State,
-    transactions::extract_archive,
-    workflow::artifact::{Artifact, download_artifact},
+    framework::StateResult,
+    transactions::{download_artifact, extract_archive},
+    workflow::artifact::Artifact,
 };
 
 use anyhow::{Error, anyhow};
@@ -23,26 +23,29 @@ enum Case {
 
 /// Downloads an [`Artifact`] and extracts the downloaded archive to a specified path.
 ///
+/// # Errors
+///
+/// Returns an error that instructs retrying or cancelling if downloading or extracting the artifact fails.
+///
 /// See: [`download_artifact`], [`extract_archive`]
-pub async fn download_and_extract_archive<P>(artifact: Artifact, path: P) -> State<()>
+pub async fn download_artifact_and_extract<P>(artifact: Artifact, path: P) -> StateResult<()>
 where
     P: AsRef<Path> + Send + Sync + Debug,
 {
     match download_artifact(&artifact).await {
-        State::Success(stream) => {
+        Ok(stream) => {
             info!("downloading artifact {artifact}…",);
             let case = extract(stream, artifact.digest.as_deref(), &path).await;
 
             info!("downloaded artifact {artifact}");
             cleanup(artifact.clone(), case, &path).await;
 
-            State::Success(())
+            Ok(())
         }
-        State::Retry => {
-            error!("failed to download artifact {artifact}",);
-            State::Retry
+        Err(err) => {
+            error!("failed to download artifact {artifact}");
+            Err(err)
         }
-        State::Stop => State::Stop,
     }
 }
 

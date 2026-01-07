@@ -6,20 +6,24 @@ use crate::static_lazy_lock;
 
 use std::env;
 
+mod __priv_macro_use {
+    pub use crate::parse_env;
+    pub use anyhow;
+    pub use std::env;
+}
+
 /// Parses an environment variable from [`String`] to something else, wrapping any error in [`anyhow::Error`].
 #[macro_export]
 macro_rules! parse_env {
     ($key:expr => |$var:ident| $expr:expr) => {
-        std::env::var($key)
-            .map_err(|e| anyhow::anyhow!(e))
+        $crate::env::__priv_macro_use::env::var($key)
+            .map_err(|e| $crate::env::__priv_macro_use::anyhow::anyhow!(e))
             .and_then(|$var| $expr)
     };
     ($key:expr => |$var:ident| $expr:expr; anyhow) => {
-        parse_env!($key => |$var| $expr.map_err(|e| anyhow::anyhow!(e)))
+        $crate::env::__priv_macro_use::parse_env!($key => |$var| $expr.map_err(|e| $crate::env::__priv_macro_use::anyhow::anyhow!(e)))
     };
 }
-
-pub use parse_env;
 
 #[cfg(feature = "env_github_token")]
 static_lazy_lock! {

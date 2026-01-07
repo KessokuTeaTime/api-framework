@@ -6,6 +6,10 @@ pub mod shutdown;
 pub mod transactions;
 pub mod workflow;
 
+mod __priv_macro_use {
+    pub use std::sync::LazyLock;
+}
+
 /// A shorthand to define a statically allocated variable using a [`std::sync::LazyLock`].
 ///
 /// # Examples
@@ -21,7 +25,7 @@ pub mod workflow;
 macro_rules! static_lazy_lock {
     ($(#[$meta:meta])* $vis:vis $name:ident: $type:ty = $expr:expr $(;)?) => {
         $(#[$meta])*
-        $vis static $name: std::sync::LazyLock<$type> =
-            std::sync::LazyLock::new(|| $expr);
+        $vis static $name: $crate::__priv_macro_use::LazyLock<$type> =
+            $crate::__priv_macro_use::LazyLock::new(|| $expr);
     };
 }

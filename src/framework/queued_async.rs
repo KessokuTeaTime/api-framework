@@ -1,6 +1,8 @@
 //! A framework that loops transactions until the max retry times is reached, or a stop signal is received, or a value is returned.
 
-use super::{State, retry_if_possible};
+use crate::framework::{StateError, StateResult};
+
+use super::retry_if_possible;
 
 use std::{
     collections::HashMap,
@@ -33,26 +35,28 @@ pub struct QueuedAsyncFrameworkContext {
 }
 
 impl QueuedAsyncFrameworkContext {
-    /// Checks if the current business is the latest, and returns a corresponding [`State<()>`] that can be directly unwrapped using [`unwrap`].
-    pub fn check(&self) -> State<()> {
+    /// Checks if a newer business exist, conforming to a [`StateResult`] with type `T`.
+    ///
+    /// # Errors
+    ///
+    /// An error of [`StateError::Cancelled`] is returned if a newer business exist.
+    pub fn check<T>(&self, returning: T) -> StateResult<T> {
         let latest_payload_index = &self.holder.latest_payload_index.load(Ordering::SeqCst);
         if self.index < latest_payload_index - 1 {
             warn!(
                 "current payload index ({}) is falling behind the latest one ({latest_payload_index}), exiting deployment {}!",
                 &self.index, &self.name
             );
-            State::Stop
+            Err(StateError::Cancelled)
         } else {
-            State::Success(())
+            Ok(returning)
         }
     }
 }
 
 /// A framework that loops transactions until the max retry times is reached, or a stop signal is received, or a value is returned.
 ///
-/// This framework ensures that the latest business is always executed. The ongoing business should check itself constantly in case a newer business arrives. This is achieved through an index that grows with collapsing businesses, and the [`QueuedAsyncFrameworkContext::check`] function along with the [`unwrap`] macro.
-///
-/// See: [`example`], [`unwrap`]
+/// This framework ensures that the latest business is always executed. The ongoing business should check itself constantly in case a newer business arrives. This is achieved through an index that grows with collapsing businesses, and the [`QueuedAsyncFrameworkContext::check`] function along with result propagation.
 #[derive(Debug, Default)]
 pub struct QueuedAsyncFramework<ID>
 where
@@ -79,11 +83,15 @@ where
 {
     /// Runs transactions asynchronously with a distinguishable id. The name of the business will be the display format of the id.
     ///
+    /// # Errors
+    ///
+    /// Returns the final result of the transaction as-is.
+    ///
     /// See: [`Self::run_with_name`]
-    pub async fn run<F>(&self, id: ID, f: F)
+    pub async fn run<F, R>(&self, id: ID, f: F) -> StateResult<R>
     where
         ID: Display,
-        F: Fn(QueuedAsyncFrameworkContext) -> Pin<Box<dyn Future<Output = State<()>> + Send>>
+        F: Fn(QueuedAsyncFrameworkContext) -> Pin<Box<dyn Future<Output = StateResult<R>> + Send>>
             + Send
             + Sync,
     {
@@ -92,9 +100,13 @@ where
     }
 
     /// Runs transactions asynchronously with a distinguishable id and a name.
-    pub async fn run_with_name<F>(&self, id: ID, name: String, f: F)
+    ///
+    /// # Errors
+    ///
+    /// Returns the final result of the transaction as-is.
+    pub async fn run_with_name<F, R>(&self, id: ID, name: String, f: F) -> StateResult<R>
     where
-        F: Fn(QueuedAsyncFrameworkContext) -> Pin<Box<dyn Future<Output = State<()>> + Send>>
+        F: Fn(QueuedAsyncFrameworkContext) -> Pin<Box<dyn Future<Output = StateResult<R>> + Send>>
             + Send
             + Sync,
     {
@@ -111,21 +123,24 @@ where
         let _guard = holder.lock.lock().await;
 
         loop {
-            match context.check().replace(f(context.clone()).await) {
-                State::Success(_) => {
+            match f(context.clone()).await.and_then(|r| context.check(r)) {
+                Ok(result) => {
+                    info!("transaction {name} succeed!");
                     holder
                         .latest_payload_index
                         .store(u8::default(), Ordering::SeqCst);
-                    info!("transaction {name} succeed!");
-                    break;
+                    return Ok(result);
                 }
-                State::Retry => match retry_if_possible(&mut retry) {
+                Err(StateError::Retry) => match retry_if_possible(&mut retry) {
                     Ok(_) => continue,
-                    Err(_) => break,
+                    Err(_) => {
+                        error!("transaction {name} failed!");
+                        return Err(StateError::Retry);
+                    }
                 },
-                State::Stop => {
-                    error!("transaction {name} failed!");
-                    break;
+                Err(StateError::Cancelled) => {
+                    error!("transaction {name} cancelled!");
+                    return Err(StateError::Cancelled);
                 }
             }
         }
@@ -135,35 +150,35 @@ where
 #[cfg(test)]
 #[tokio::test]
 async fn example() {
-    use super::unwrap;
-
-    // Defines a framework
-    // This leverages `LazyLock` to generate a static value
+    // defines a framework
+    // leverage `LazyLock` to generate a static value
     static FRAMEWORK: LazyLock<QueuedAsyncFramework<i32>> =
         LazyLock::new(QueuedAsyncFramework::new);
 
-    // Runs the transaction inside the framework
-    FRAMEWORK
+    // runs the transaction inside the framework
+    let result = FRAMEWORK
         .run(42, |cx| {
             // Pinboxes the transaction and clone the context
             Box::pin(transaction(cx))
         })
         .await;
 
-    async fn transaction(cx: QueuedAsyncFrameworkContext) -> State<()> {
-        // Checks if a newer business exist, and stops executing if so
-        unwrap!(cx.check());
+    assert!(result.is_ok());
 
-        // Any logic returning a `State` can be unwrapped...
-        let greeting = unwrap!(greet().await);
+    async fn transaction(cx: QueuedAsyncFrameworkContext) -> StateResult<()> {
+        // checks if a newer business exist, and stops executing if so
+        cx.check(())?;
+
+        // any logic returning a `State` can be unwrapped...
+        let greeting = greet().await?;
         // ...while `State::Retry` and `State::Stop` can control the loop directly
         assert!(greeting == "42!");
 
-        // To exit successfully...
-        State::Success(())
+        // to exit successfully...
+        Ok(())
     }
 
-    async fn greet() -> State<String> {
-        State::Success(String::from("42!"))
+    async fn greet() -> StateResult<String> {
+        Ok(String::from("42!"))
     }
 }

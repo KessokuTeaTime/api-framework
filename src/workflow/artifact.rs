@@ -1,14 +1,11 @@
 //! Artifacts from GitHub REST API and related functions.
 
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
-use futures::Stream;
 use reqwest::{RequestBuilder, header};
 use serde::Deserialize;
-use tokio_util::bytes::Bytes;
-use tracing::{debug, error, info};
 
-use crate::{env::GITHUB_TOKEN, framework::State, workflow::WorkflowRun};
+use crate::{env::GITHUB_TOKEN, workflow::WorkflowRun};
 
 /// Represents artifacts from GitHub REST API.
 #[derive(Debug, Deserialize, Clone)]
@@ -52,130 +49,4 @@ pub fn github_api_request_builder(url: &str) -> RequestBuilder {
         .bearer_auth(&*GITHUB_TOKEN)
         .header("X-GitHub-Api-Version", "2022-11-28")
         .header("User-Agent", "KessokuTeaTime-API/1.0")
-}
-
-/// Fetches artifacts from GitHub using the given parameters.
-pub async fn fetch_artifacts(
-    owner: &str,
-    repo: &str,
-    run_id: &str,
-    count: Option<u8>,
-) -> State<Vec<Artifact>> {
-    let url =
-        format!("https://api.github.com/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts");
-    match &count {
-        Some(1) => debug!("fetching 1 artifact from {url}…"),
-        Some(count) => debug!("fetching {count} artifacts from {url}…"),
-        None => debug!("fetching artifacts from {url}…"),
-    }
-
-    let response = match github_api_request_builder(&url).send().await {
-        Ok(response) => response,
-        Err(err) => {
-            error!("failed to fetch artifacts from {url}: {err}");
-            return match err {
-                _ if err.is_connect() || err.is_timeout() => State::Retry,
-                _ => State::Stop,
-            };
-        }
-    };
-
-    match response.json::<Artifacts>().await {
-        Ok(artifacts) => match artifacts.total_count {
-            0 => {
-                error!("invalid workflow data: no artifacts at {url}!");
-                State::Stop
-            }
-            total_count => match &count {
-                Some(count) => match total_count {
-                    total_count if total_count < *count => {
-                        error!(
-                            "invalid workflow data: too little artifacts at {url}! expected {count}, got {total_count}"
-                        );
-                        State::Stop
-                    }
-                    total_count if total_count > *count => {
-                        error!(
-                            "invalid workflow data: too many artifacts at {url}! expected {count}, got {total_count}",
-                        );
-                        State::Stop
-                    }
-                    total_count => {
-                        match total_count {
-                            1 => info!("fetched 1 artifact from {url}"),
-                            count => info!("fetched {count} artifacts from {url}"),
-                        }
-                        State::Success(artifacts.artifacts)
-                    }
-                },
-                None => State::Success(artifacts.artifacts),
-            },
-        },
-        Err(err) => {
-            error!("failed to parse data from {url}: {err}");
-
-            if let Some(source) = err.source() {
-                error!("{source}")
-            }
-
-            State::Retry
-        }
-    }
-}
-
-/// Fetches the only artifact from GitHub using the given parameters.
-pub async fn fetch_artifact(owner: &str, repo: &str, run_id: &str) -> State<Artifact> {
-    fetch_artifacts(owner, repo, run_id, Some(1))
-        .await
-        .map(|artifacts| artifacts[0].clone())
-}
-
-/// Downloads the specified artifact from GitHub.
-pub async fn download_artifact(
-    artifact: &Artifact,
-) -> State<impl Stream<Item = Result<Bytes, reqwest::Error>> + use<>> {
-    debug!(
-        "requesting download from {}…",
-        &artifact.archive_download_url
-    );
-
-    match github_api_request_builder(&artifact.archive_download_url)
-        .send()
-        .await
-    {
-        Ok(resp) => {
-            let stream = resp.bytes_stream();
-            info!("requested download from {}", artifact.archive_download_url);
-            State::Success(stream)
-        }
-        Err(err) => match err.status() {
-            Some(reqwest::StatusCode::GONE) => {
-                error!("failed to request download: artifact expired or removed");
-                State::Stop
-            }
-            Some(status) => {
-                if let Some(reason) = status.canonical_reason() {
-                    error!(
-                        "failed to request download from {}: {} {reason}",
-                        &artifact.archive_download_url,
-                        status.as_u16()
-                    );
-                } else {
-                    error!(
-                        "failed to request download from {}: {}",
-                        &artifact.archive_download_url,
-                        status.as_u16()
-                    )
-                }
-                State::Retry
-            }
-            None => {
-                error!(
-                    "failed to download artifact at {}",
-                    &artifact.archive_download_url
-                );
-                State::Retry
-            }
-        },
-    }
 }
