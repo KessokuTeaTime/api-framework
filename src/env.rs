@@ -6,12 +6,6 @@ use crate::static_lazy_lock;
 
 use std::env;
 
-mod __priv_macro_use {
-    pub use crate::parse_env;
-    pub use anyhow;
-    pub use std::env;
-}
-
 /// Parses an environment variable from [`String`] to something else, wrapping any error in [`anyhow::Error`].
 #[macro_export]
 macro_rules! parse_env {
@@ -35,4 +29,11 @@ static_lazy_lock! {
 static_lazy_lock! {
     /// The maximum retry limit for transactions.
     pub MAX_RETRIES: u8 = parse_env!("MAX_RETRIES" => |s| s.parse::<u8>(); anyhow).unwrap_or(5);
+}
+
+#[doc(hidden)]
+pub mod __priv_macro_use {
+    pub use crate::parse_env;
+    pub use anyhow;
+    pub use std::env;
 }
